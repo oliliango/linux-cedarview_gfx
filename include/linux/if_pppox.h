@@ -50,6 +50,12 @@ struct pppolac_opt {
 	__u8	sequencing;
 };
 
+struct pppopns_opt {
+	__u16	local;
+	__u16	remote;
+	__u32	sequence;
+};
+
 #include <net/sock.h>
 
 struct pppox_sock {
@@ -61,6 +67,7 @@ struct pppox_sock {
 		struct pppoe_opt pppoe;
 		struct pptp_opt  pptp;
 		struct pppolac_opt lac;
+		struct pppopns_opt pns;
 	} proto;
 	__be16			num;
 };
