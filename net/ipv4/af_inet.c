@@ -121,6 +121,16 @@
 
 #ifdef CONFIG_ANDROID_PARANOID_NETWORK
 #include <linux/android_aid.h>
+
+static inline int current_has_network(struct user_namespace *user_ns)
+{
+	return in_egroup_p(AID_INET) || ns_capable(user_ns, CAP_NET_RAW);
+}
+#else
+static inline int current_has_network(void)
+{
+	return 1;
+}
 #endif
 
 /* The inetsw table contains everything that inet_create needs to
@@ -281,29 +291,6 @@ static inline int inet_netns_ok(struct net *net, __u8 protocol)
 	return ipprot->netns_ok;
 }
 
-#ifdef CONFIG_ANDROID_PARANOID_NETWORK
-static inline int current_has_network(void)
-{
-	return (!current_euid() || in_egroup_p(AID_INET) ||
-		in_egroup_p(AID_NET_RAW));
-}
-static inline int current_has_cap(struct user_namespace *user_ns, int cap)
-{
-	if (cap == CAP_NET_RAW && in_egroup_p(AID_NET_RAW))
-		return 1;
-	return ns_capable(user_ns, cap);
-}
-# else
-static inline int current_has_network(void)
-{
-	return 1;
-}
-static inline int current_has_cap(struct user_namespace *user_ns, int cap)
-{
-	return ns_capable(user_ns, cap);
-}
-#endif
-
 /*
  *	Create an inet socket.
  */
@@ -320,7 +307,7 @@ static int inet_create(struct net *net, struct socket *sock, int protocol,
 	int try_loading_module = 0;
 	int err;
 
-	if (!current_has_network())
+	if (!current_has_network(net->user_ns))
 		return -EACCES;
 
 	if (unlikely(!inet_ehash_secret))
@@ -376,7 +363,7 @@ lookup_protocol:
 
 	err = -EPERM;
 	if (sock->type == SOCK_RAW && !kern &&
-	    !current_has_cap(net->user_ns, CAP_NET_RAW))
+			!ns_capable(net->user_ns, CAP_NET_RAW))
 		goto out_rcu_unlock;
 
 	err = -EAFNOSUPPORT;
