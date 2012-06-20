@@ -62,7 +62,7 @@ static void power_supply_changed_work(struct work_struct *work)
 		spin_lock_irqsave(&psy->changed_lock, flags);
 	}
 	if (!psy->changed)
-		wake_unlock(&psy->work_wake_lock);
+		pm_relax(psy->dev);
 	spin_unlock_irqrestore(&psy->changed_lock, flags);
 }
 
@@ -74,7 +74,7 @@ void power_supply_changed(struct power_supply *psy)
 
 	spin_lock_irqsave(&psy->changed_lock, flags);
 	psy->changed = true;
-	wake_lock(&psy->work_wake_lock);
+	pm_stay_awake(psy->dev);
 	spin_unlock_irqrestore(&psy->changed_lock, flags);
 	schedule_work(&psy->changed_work);
 }
@@ -370,7 +370,9 @@ int power_supply_register(struct device *parent, struct power_supply *psy)
 		goto register_cooler_failed;
 
 	spin_lock_init(&psy->changed_lock);
-	wake_lock_init(&psy->work_wake_lock, WAKE_LOCK_SUSPEND, "power-supply");
+	rc = device_init_wakeup(dev, true);
+	if (rc)
+		goto wakeup_init_failed;
 
 	rc = power_supply_create_triggers(psy);
 	if (rc)
@@ -381,7 +383,7 @@ int power_supply_register(struct device *parent, struct power_supply *psy)
 	goto success;
 
 create_triggers_failed:
-	wake_lock_destroy(&psy->work_wake_lock);
+wakeup_init_failed:
 	psy_unregister_cooler(psy);
 register_cooler_failed:
 	psy_unregister_thermal(psy);
@@ -402,7 +404,6 @@ void power_supply_unregister(struct power_supply *psy)
 	power_supply_remove_triggers(psy);
 	psy_unregister_cooler(psy);
 	psy_unregister_thermal(psy);
-	wake_lock_destroy(&psy->work_wake_lock);
 	device_unregister(psy->dev);
 }
 EXPORT_SYMBOL_GPL(power_supply_unregister);
