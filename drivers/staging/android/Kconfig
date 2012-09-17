@@ -36,6 +36,12 @@ config ANDROID_LOGGER_PANIC_DUMP
 	  each log will be copied in binary format to pstore and, after
 	  the next boot, will appear as files in the pstore file system.
 
+config ANDROID_LOGGER_DUMPER
+	tristate "Android log kernel dumper"
+	help
+	 uses the Android logger dumping interface to dump the logger buffers
+	 to kernel console using printk's.
+
 config ANDROID_TIMED_OUTPUT
 	bool "Timed output class driver"
 	default y
