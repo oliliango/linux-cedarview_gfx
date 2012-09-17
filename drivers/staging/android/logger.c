@@ -62,7 +62,8 @@ struct logger_log {
 };
 
 static LIST_HEAD(log_list);
-
+static LIST_HEAD(aux_logger_devices);
+static DEFINE_MUTEX(devicelist_mtx);
 
 /**
  * struct logger_reader - a logging device open for reading
@@ -461,6 +462,47 @@ static ssize_t do_write_log_from_user(struct logger_log *log,
 }
 
 /*
+ * aux_write_log_entry - dumps the last logger_entry via aux_logger interface
+ * to registered clients.
+ */
+static void aux_write_log_entry(struct logger_log *log, size_t off)
+{
+	size_t len;
+	size_t count;
+	struct aux_logger_device *aux;
+
+	/* get the size of the next entry */
+	count = get_entry_msg_len(log, off);
+	/* skip the entry header */
+	off += sizeof(struct logger_entry);
+
+	mutex_lock(&devicelist_mtx);
+	list_for_each_entry(aux, &aux_logger_devices, list) {
+		/*
+		 * We dump from the log in two disjoint operations. First, we
+		 * dump from the current head offset up to 'count' bytes or to
+		 * the end of the log, whichever comes first.
+		 */
+		len = min(count, log->size - off);
+		aux->write_log_entry(log->misc.name,
+			log->buffer + off,
+			len,
+			(count == len));
+
+		/*
+		 * Second, we dump any remaining bytes, starting back at the
+		 * head of the log.
+		 */
+		if (count != len)
+			aux->write_log_entry(log->misc.name,
+				log->buffer,
+				count - len,
+				true);
+	}
+	mutex_unlock(&devicelist_mtx);
+}
+
+/*
  * logger_aio_write - our write method, implementing support for write(),
  * writev(), and aio_write(). Writes are our fast path, and we try to optimize
  * them above all else.
@@ -518,6 +560,8 @@ static ssize_t logger_aio_write(struct kiocb *iocb, const struct iovec *iov,
 		iov++;
 		ret += nr;
 	}
+
+	aux_write_log_entry(log, orig);
 
 	mutex_unlock(&log->mutex);
 
@@ -739,6 +783,29 @@ static const struct file_operations logger_fops = {
 	.open = logger_open,
 	.release = logger_release,
 };
+
+int register_aux_logger(struct aux_logger_device *device)
+{
+
+	/* Add device to dumper devices list */
+	mutex_lock(&devicelist_mtx);
+	list_add_tail(&device->list, &aux_logger_devices);
+	mutex_unlock(&devicelist_mtx);
+
+	return 0;
+}
+EXPORT_SYMBOL(register_aux_logger);
+
+int unregister_aux_logger(struct aux_logger_device *device)
+{
+	/* Remove device from dumper devices list */
+	mutex_lock(&devicelist_mtx);
+	list_del(&device->list);
+	mutex_unlock(&devicelist_mtx);
+
+	return 0;
+}
+EXPORT_SYMBOL(unregister_aux_logger);
 
 /*
  * Log size must be a power of two, greater than LOGGER_ENTRY_MAX_LEN,

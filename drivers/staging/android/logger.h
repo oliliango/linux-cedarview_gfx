@@ -77,4 +77,19 @@ struct logger_entry {
 #define LOGGER_GET_VERSION		_IO(__LOGGERIO, 5) /* abi version */
 #define LOGGER_SET_VERSION		_IO(__LOGGERIO, 6) /* abi version */
 
+#ifdef __KERNEL__
+
+struct aux_logger_device {
+	void (*write_log_entry)(const char *log_name,
+		const char *buf,
+		size_t count,
+		bool last_dump);
+	struct list_head list; /* list of dumper devices */
+};
+
+extern int register_aux_logger(struct aux_logger_device *device);
+extern int unregister_aux_logger(struct aux_logger_device *device);
+
+#endif /* __KERNEL__ */
+
 #endif /* _LINUX_LOGGER_H */
