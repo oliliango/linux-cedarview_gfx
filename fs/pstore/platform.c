@@ -34,6 +34,7 @@
 #include <linux/jiffies.h>
 #include <linux/workqueue.h>
 #include <linux/debugfs.h>
+#include <linux/notifier.h>
 
 #include "internal.h"
 
@@ -74,6 +75,20 @@ void pstore_set_kmsg_bytes(int bytes)
 	kmsg_bytes = bytes;
 }
 
+static ATOMIC_NOTIFIER_HEAD(pstore_notifiers);
+
+int pstore_notifier_register(struct notifier_block *n)
+{
+	return atomic_notifier_chain_register(&pstore_notifiers, n);
+}
+EXPORT_SYMBOL_GPL(pstore_notifier_register);
+
+int pstore_notifier_unregister(struct notifier_block *n)
+{
+	return atomic_notifier_chain_unregister(&pstore_notifiers, n);
+}
+EXPORT_SYMBOL_GPL(pstore_notifier_unregister);
+
 /* Tag each group of saved records with a sequence number */
 static int	oopscount;
 
@@ -95,6 +110,26 @@ static const char *get_reason_str(enum kmsg_dump_reason reason)
 	default:
 		return "Unknown";
 	}
+}
+
+static int pstore_ext_flush(void)
+{
+	int ret;
+
+	if (!psinfo->ext_len)
+		return 0;
+
+	ret = psinfo->write(psinfo->ext_type, psinfo->ext_reason,
+			    &psinfo->ext_id, psinfo->ext_part++,
+			    0, psinfo->ext_len, psinfo);
+
+	if (ret == 0 && psinfo->ext_reason == KMSG_DUMP_OOPS &&
+	    pstore_is_mounted())
+		pstore_new_entry = 1;
+
+	psinfo->ext_len = 0;
+
+	return ret;
 }
 
 /*
@@ -122,6 +157,15 @@ static void pstore_dump(struct kmsg_dumper *dumper,
 	} else
 		spin_lock_irqsave(&psinfo->buf_lock, flags);
 	oopscount++;
+
+	psinfo->ext_id = 0;
+	psinfo->ext_len = 0;
+	psinfo->ext_part = 0;
+	psinfo->ext_type = PSTORE_TYPE_UNKNOWN;
+	psinfo->ext_reason = reason;
+
+	atomic_notifier_call_chain(&pstore_notifiers, PSTORE_BEGIN, psinfo);
+
 	while (total < kmsg_bytes) {
 		char *dst;
 		unsigned long size;
@@ -148,6 +192,13 @@ static void pstore_dump(struct kmsg_dumper *dumper,
 		total += hsize + len;
 		part++;
 	}
+
+	atomic_notifier_call_chain(&pstore_notifiers, PSTORE_DUMP, psinfo);
+
+	pstore_ext_flush();
+
+	atomic_notifier_call_chain(&pstore_notifiers, PSTORE_END, psinfo);
+
 	if (in_nmi()) {
 		if (is_locked)
 			spin_unlock(&psinfo->buf_lock);
@@ -369,6 +420,43 @@ static void pstore_timefunc(unsigned long dummy)
 
 	mod_timer(&pstore_timer, jiffies + msecs_to_jiffies(pstore_update_ms));
 }
+
+/* pstore_write must only be called from PSTORE_DUMP notifier callbacks */
+int pstore_write(enum pstore_type_id type, const char *buf, size_t size)
+{
+	size_t len;
+	int err = 0, err2;
+
+	if (!psinfo)
+		return -ENODEV;
+
+	/*
+	 * No locking is needed because pstore_write is called only from
+	 * PSTORE_DUMP notifier callbacks.
+	 */
+
+	if (type != psinfo->ext_type) {
+		err = pstore_ext_flush();
+		psinfo->ext_type = type;
+		psinfo->ext_part = 1;
+	}
+
+	while (size) {
+		len = min(size, psinfo->bufsize - psinfo->ext_len);
+		memcpy(psinfo->buf + psinfo->ext_len, buf, len);
+		psinfo->ext_len += len;
+		buf += len;
+		size -= len;
+		if (psinfo->ext_len == psinfo->bufsize) {
+			err2 = pstore_ext_flush();
+			if (err2 && !err)
+				err = err2;
+		}
+	}
+
+	return err;
+}
+EXPORT_SYMBOL_GPL(pstore_write);
 
 module_param(backend, charp, 0444);
 MODULE_PARM_DESC(backend, "Pstore backend to use");

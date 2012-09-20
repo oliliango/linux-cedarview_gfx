@@ -40,17 +40,27 @@ enum pstore_type_id {
 
 struct module;
 
+/* Notifier events */
+#define PSTORE_BEGIN		1
+#define PSTORE_DUMP		2
+#define PSTORE_END		3
+
 #define PSTORE_NO_HEADINGS	BIT(0)
 #define PSTORE_MAX_KMSG_BYTES	BIT(1)
 
 struct pstore_info {
-	struct module	*owner;
-	char		*name;
-	unsigned int	flags;
-	spinlock_t	buf_lock;	/* serialize access to 'buf' */
-	char		*buf;
-	size_t		bufsize;
-	struct mutex	read_mutex;	/* serialize open/read/close */
+	struct module		*owner;
+	char			*name;
+	unsigned int		flags;
+	spinlock_t		buf_lock;	/* serialize access to 'buf' */
+	char			*buf;
+	size_t			bufsize;
+	struct mutex		read_mutex;	/* serialize open/read/close */
+	u64			ext_id;
+	size_t			ext_len;
+	unsigned int		ext_part;
+	enum pstore_type_id	ext_type;
+	enum kmsg_dump_reason	ext_reason;
 	int		(*open)(struct pstore_info *psi);
 	int		(*close)(struct pstore_info *psi);
 	ssize_t		(*read)(u64 *id, enum pstore_type_id *type,
@@ -72,11 +82,30 @@ struct pstore_info {
 
 #ifdef CONFIG_PSTORE
 extern int pstore_register(struct pstore_info *);
+extern int pstore_notifier_register(struct notifier_block *n);
+extern int pstore_notifier_unregister(struct notifier_block *n);
+/* pstore_write must only be called from PSTORE_DUMP notifier callbacks */
+extern int pstore_write(enum pstore_type_id type, const char *buf, size_t size);
 #else
 static inline int
 pstore_register(struct pstore_info *psi)
 {
 	return -ENODEV;
+}
+static inline int
+pstore_notifier_register(struct notifier_block *n)
+{
+	return 0;
+}
+static inline int
+pstore_notifier_unregister(struct notifier_block *n)
+{
+	return 0;
+}
+static inline int
+pstore_write(enum pstore_type_id type, const char *buf, size_t size)
+{
+	return 0;
 }
 #endif
 
