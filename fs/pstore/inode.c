@@ -400,6 +400,8 @@ static int pstore_fill_super(struct super_block *sb, void *data, int silent)
 
 	pstore_get_records(0);
 
+	pstore_add_timer();
+
 	return 0;
 }
 
@@ -411,6 +413,7 @@ static struct dentry *pstore_mount(struct file_system_type *fs_type,
 
 static void pstore_kill_sb(struct super_block *sb)
 {
+	pstore_del_timer();
 	kill_litter_super(sb);
 	pstore_sb = NULL;
 }

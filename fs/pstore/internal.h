@@ -54,4 +54,6 @@ extern int	pstore_mkfile(enum pstore_type_id, char *psname, u64 id,
 			      struct timespec time, struct pstore_info *psi);
 extern int	pstore_is_mounted(void);
 
+extern void pstore_add_timer(void);
+extern void pstore_del_timer(void);
 #endif

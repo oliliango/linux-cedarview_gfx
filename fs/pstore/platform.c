@@ -54,6 +54,8 @@ static int pstore_new_entry;
 
 static void pstore_timefunc(unsigned long);
 static DEFINE_TIMER(pstore_timer, pstore_timefunc, 0, 0);
+static DEFINE_SPINLOCK(pstore_timer_lock);
+static int pstore_timer_on;
 
 static void pstore_dowork(struct work_struct *);
 static DECLARE_WORK(pstore_work, pstore_dowork);
@@ -352,12 +354,6 @@ int pstore_register(struct pstore_info *psi)
 	pstore_register_console();
 	pstore_register_ftrace();
 
-	if (pstore_update_ms >= 0) {
-		pstore_timer.expires = jiffies +
-			msecs_to_jiffies(pstore_update_ms);
-		add_timer(&pstore_timer);
-	}
-
 	pstore_debugfs_init();
 
 	return 0;
@@ -413,12 +409,38 @@ static void pstore_dowork(struct work_struct *work)
 
 static void pstore_timefunc(unsigned long dummy)
 {
+	unsigned long flags;
+
 	if (pstore_new_entry) {
 		pstore_new_entry = 0;
 		schedule_work(&pstore_work);
 	}
 
-	mod_timer(&pstore_timer, jiffies + msecs_to_jiffies(pstore_update_ms));
+	spin_lock_irqsave(&pstore_timer_lock, flags);
+	if (pstore_timer_on)
+		mod_timer(&pstore_timer,
+				jiffies + msecs_to_jiffies(pstore_update_ms));
+	spin_unlock_irqrestore(&pstore_timer_lock, flags);
+}
+
+void pstore_add_timer(void)
+{
+	pstore_timer_on = 1;
+	if (pstore_update_ms >= 0) {
+		pstore_timer.expires = jiffies +
+			msecs_to_jiffies(pstore_update_ms);
+		add_timer(&pstore_timer);
+	}
+}
+
+void pstore_del_timer(void)
+{
+	unsigned long flags;
+
+	spin_lock_irqsave(&pstore_timer_lock, flags);
+	pstore_timer_on = 0;
+	spin_unlock_irqrestore(&pstore_timer_lock, flags);
+	del_timer_sync(&pstore_timer);
 }
 
 /* pstore_write must only be called from PSTORE_DUMP notifier callbacks */
