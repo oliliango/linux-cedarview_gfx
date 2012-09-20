@@ -156,23 +156,30 @@ static ssize_t ramoops_pstore_read(u64 *id, enum pstore_type_id *type,
 	time->tv_nsec = 0;
 
 	size = persistent_ram_old_size(prz);
+	if (!size)
+		return 0;
 	*buf = kmalloc(size, GFP_KERNEL);
 	if (*buf == NULL)
 		return -ENOMEM;
 	memcpy(*buf, persistent_ram_old(prz), size);
+	/* Read header. */
+	sscanf(*buf, "%u" RAMOOPS_KERNMSG_HDR "%lu.%lu",
+		type, &time->tv_sec, &time->tv_nsec);
+	time->tv_nsec *= 1000;
 
 	return size;
 }
 
-static size_t ramoops_write_kmsg_hdr(struct persistent_ram_zone *prz)
+static size_t ramoops_write_kmsg_hdr(struct persistent_ram_zone *prz,
+				     enum pstore_type_id type)
 {
 	char *hdr;
 	struct timeval timestamp;
 	size_t len;
 
 	do_gettimeofday(&timestamp);
-	hdr = kasprintf(GFP_ATOMIC, RAMOOPS_KERNMSG_HDR "%lu.%lu\n",
-		(long)timestamp.tv_sec, (long)timestamp.tv_usec);
+	hdr = kasprintf(GFP_ATOMIC, "%u" RAMOOPS_KERNMSG_HDR "%lu.%lu\n",
+		type, (long)timestamp.tv_sec, (long)timestamp.tv_usec);
 	WARN_ON_ONCE(!hdr);
 	len = hdr ? strlen(hdr) : 0;
 	persistent_ram_write(prz, hdr, len);
@@ -203,9 +210,6 @@ static int notrace ramoops_pstore_write_buf(enum pstore_type_id type,
 		return 0;
 	}
 
-	if (type != PSTORE_TYPE_DMESG)
-		return -EINVAL;
-
 	/* Out of the various dmesg dump types, ramoops is currently designed
 	 * to only store crash logs, rather than storing general kernel logs.
 	 */
@@ -230,7 +234,7 @@ static int notrace ramoops_pstore_write_buf(enum pstore_type_id type,
 
 	prz = cxt->przs[cxt->dump_write_cnt];
 
-	hlen = ramoops_write_kmsg_hdr(prz);
+	hlen = ramoops_write_kmsg_hdr(prz, type);
 	if (size + hlen > prz->buffer_size)
 		size = prz->buffer_size - hlen;
 	persistent_ram_write(prz, buf, size);
