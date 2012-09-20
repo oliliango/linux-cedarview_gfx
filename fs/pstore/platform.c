@@ -128,7 +128,11 @@ static void pstore_dump(struct kmsg_dumper *dumper,
 		size_t len;
 
 		dst = psinfo->buf;
-		hsize = sprintf(dst, "%s#%d Part%d\n", why, oopscount, part);
+		if (psinfo->flags & PSTORE_NO_HEADINGS)
+			hsize = 0;
+		else
+			hsize = sprintf(dst, "%s#%d Part%d\n", why, oopscount,
+					part);
 		size = psinfo->bufsize - hsize;
 		dst += hsize;
 
@@ -237,6 +241,9 @@ int pstore_register(struct pstore_info *psi)
 		psinfo = NULL;
 		return -EINVAL;
 	}
+
+	if (psinfo->flags & PSTORE_MAX_KMSG_BYTES)
+		kmsg_bytes = ULONG_MAX;
 
 	if (pstore_is_mounted())
 		pstore_get_records(0);

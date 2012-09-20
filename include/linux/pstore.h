@@ -40,9 +40,13 @@ enum pstore_type_id {
 
 struct module;
 
+#define PSTORE_NO_HEADINGS	BIT(0)
+#define PSTORE_MAX_KMSG_BYTES	BIT(1)
+
 struct pstore_info {
 	struct module	*owner;
 	char		*name;
+	unsigned int	flags;
 	spinlock_t	buf_lock;	/* serialize access to 'buf' */
 	char		*buf;
 	size_t		bufsize;
