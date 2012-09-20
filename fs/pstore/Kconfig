@@ -48,3 +48,15 @@ config PSTORE_RAM
 	  "ramoops.ko".
 
 	  For more information, see Documentation/ramoops.txt.
+
+config PSTORE_DUMP_TASKS
+	bool "Dump task information"
+	default n
+	depends on PSTORE
+	help
+	  This option allows a dump of task information during a
+	  panic.  This is equivalent to a magic sysrq 't' command
+	  but the result is captured from the console and written
+	  to persistent storage.  Note that this happens after
+	  pstore dumps kernel messages because the task dump will
+	  overwrite other kernel messages.
