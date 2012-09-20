@@ -33,6 +33,7 @@
 #include <linux/hardirq.h>
 #include <linux/jiffies.h>
 #include <linux/workqueue.h>
+#include <linux/debugfs.h>
 
 #include "internal.h"
 
@@ -207,6 +208,54 @@ static int pstore_write_compat(enum pstore_type_id type,
 	return psi->write_buf(type, reason, id, part, psinfo->buf, size, psi);
 }
 
+#ifdef CONFIG_DEBUG_FS
+
+static DEFINE_SPINLOCK(dbg_lock);
+
+static int dbg_dump(void *data, u64 val)
+{
+	unsigned long flags;
+
+	switch (val) {
+	case KMSG_DUMP_PANIC:
+	case KMSG_DUMP_OOPS:
+	case KMSG_DUMP_EMERG:
+	case KMSG_DUMP_RESTART:
+	case KMSG_DUMP_HALT:
+	case KMSG_DUMP_POWEROFF:
+		spin_lock_irqsave(&dbg_lock, flags);
+		kmsg_dump(val);
+		spin_unlock_irqrestore(&dbg_lock, flags);
+		return 0;
+	}
+	return -EINVAL;
+}
+DEFINE_SIMPLE_ATTRIBUTE(dbg_dump_fops, NULL, dbg_dump, "%llu\n");
+
+static int dbg_panic(void *data, u64 val)
+{
+	panic(KERN_EMERG "pstore debugging panic!\n");
+	return 0;
+}
+DEFINE_SIMPLE_ATTRIBUTE(dbg_panic_fops, NULL, dbg_panic, "%llu\n");
+
+static void pstore_debugfs_init(void)
+{
+	struct dentry *root;
+
+	root = debugfs_create_dir("pstore", NULL);
+	debugfs_create_file("dump", S_IWUSR, root, NULL, &dbg_dump_fops);
+	debugfs_create_file("panic", S_IWUSR, root, NULL, &dbg_panic_fops);
+}
+
+#else
+
+static inline void pstore_debugfs_init(void)
+{
+}
+
+#endif
+
 /*
  * platform specific persistent storage driver registers with
  * us here. If pstore is already mounted, call the platform
@@ -257,6 +306,8 @@ int pstore_register(struct pstore_info *psi)
 			msecs_to_jiffies(pstore_update_ms);
 		add_timer(&pstore_timer);
 	}
+
+	pstore_debugfs_init();
 
 	return 0;
 }
