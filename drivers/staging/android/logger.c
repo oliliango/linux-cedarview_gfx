@@ -28,6 +28,7 @@
 #include <linux/slab.h>
 #include <linux/time.h>
 #include <linux/vmalloc.h>
+#include <linux/pstore.h>
 #include "logger.h"
 
 #include <asm/ioctls.h>
@@ -801,6 +802,90 @@ out_free_buffer:
 	return ret;
 }
 
+static int panic_dump;
+module_param(panic_dump, int,  S_IRUSR | S_IWUSR);
+
+#ifdef CONFIG_ANDROID_LOGGER_PANIC_DUMP
+
+static void logger_pstore_dump(struct pstore_info *psinfo,
+			       enum pstore_type_id type,
+			       struct logger_log *log)
+{
+	size_t len1, len2, offs, w_offs;
+	int locked;
+
+	/* If necessary, ignore locks when panic dumping */
+	locked = mutex_trylock(&log->mutex);
+
+	offs = log->head;
+	w_offs = log->w_off;
+
+	if (offs < w_offs) {
+		len1 = w_offs - offs;
+		len2 = 0;
+	} else {
+		len1 = log->size - offs;
+		len2 = w_offs;
+	}
+
+	pstore_write(type, log->buffer + offs, len1);
+	pstore_write(type, log->buffer, len2);
+
+	if (locked)
+		mutex_unlock(&log->mutex);
+}
+
+static enum pstore_type_id get_pstore_log_type(const struct logger_log *log)
+{
+	enum pstore_type_id type = PSTORE_TYPE_UNKNOWN;
+
+	if (!strcmp(log->misc.name, LOGGER_LOG_MAIN))
+		type = PSTORE_TYPE_LOG_MAIN;
+	else if (!strcmp(log->misc.name, LOGGER_LOG_EVENTS))
+		type = PSTORE_TYPE_LOG_EVENTS;
+	else if (!strcmp(log->misc.name, LOGGER_LOG_RADIO))
+		type = PSTORE_TYPE_LOG_RADIO;
+	else if (!strcmp(log->misc.name, LOGGER_LOG_SYSTEM))
+		type = PSTORE_TYPE_LOG_SYSTEM;
+
+	return type;
+}
+
+static int pstore_notifier_cb(struct notifier_block *nb, unsigned long event,
+			      void *_psinfo)
+{
+	struct pstore_info *psinfo = _psinfo;
+
+	if (!panic_dump || psinfo->ext_reason != KMSG_DUMP_PANIC)
+		return NOTIFY_DONE;
+
+	switch (event) {
+		case PSTORE_DUMP: {
+			struct logger_log *log;
+			list_for_each_entry(log, &log_list, logs) {
+				logger_pstore_dump(psinfo,
+						   get_pstore_log_type(log),
+						   log);
+			}
+			break;
+		}
+	}
+
+	return NOTIFY_DONE;
+}
+
+static struct notifier_block pstore_notifier = {
+	.notifier_call = pstore_notifier_cb,
+};
+
+MODULE_PARM_DESC(panic_dump, "set to 1 to enable panic dump, 0 to disable (default 0)");
+
+#else
+
+MODULE_PARM_DESC(panic_dump, "panic dump is not supported");
+
+#endif
+
 static int __init logger_init(void)
 {
 	int ret;
@@ -820,6 +905,10 @@ static int __init logger_init(void)
 	ret = create_log(LOGGER_LOG_SYSTEM, 256*1024);
 	if (unlikely(ret))
 		goto out;
+
+#ifdef CONFIG_ANDROID_LOGGER_PANIC_DUMP
+	pstore_notifier_register(&pstore_notifier);
+#endif
 
 out:
 	return ret;

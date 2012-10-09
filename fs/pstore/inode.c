@@ -327,6 +327,18 @@ int pstore_mkfile(enum pstore_type_id type, char *psname, u64 id, int count,
 	case PSTORE_TYPE_TASK_DUMP:
 		sprintf(name, "tasks-%s-%lld", psname, id);
 		break;
+	case PSTORE_TYPE_LOG_MAIN:
+		sprintf(name, "log_main-%s-%lld", psname, id);
+		break;
+	case PSTORE_TYPE_LOG_EVENTS:
+		sprintf(name, "log_events-%s-%lld", psname, id);
+		break;
+	case PSTORE_TYPE_LOG_RADIO:
+		sprintf(name, "log_radio-%s-%lld", psname, id);
+		break;
+	case PSTORE_TYPE_LOG_SYSTEM:
+		sprintf(name, "log_system-%s-%lld", psname, id);
+		break;
 	case PSTORE_TYPE_UNKNOWN:
 		sprintf(name, "unknown-%s-%lld", psname, id);
 		break;
