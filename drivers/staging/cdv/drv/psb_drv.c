@@ -1809,6 +1809,18 @@ static const struct dev_pm_ops psb_pm_ops = {
         .runtime_idle = psb_runtime_idle,
 };
 
+static const struct file_operations psb_driver_fops = {
+	.owner = THIS_MODULE,
+	.open = psb_open,
+	.release = psb_release,
+	.unlocked_ioctl = drm_ioctl,
+	.mmap = psb_mmap,
+	.poll = psb_poll,
+	.fasync = drm_fasync,
+	.read = drm_read,
+	.llseek = noop_llseek,
+};
+
 static struct drm_driver driver = {
 	.driver_features = DRIVER_HAVE_IRQ | DRIVER_IRQ_SHARED | \
 			   DRIVER_IRQ_VBL | DRIVER_MODESET,
@@ -1832,16 +1844,7 @@ static struct drm_driver driver = {
 	.suspend = PVRSRVDriverSuspend,
 	.resume = PVRSRVDriverResume,
 	.preclose = psb_driver_preclose,
-	.fops = {
-		 .owner = THIS_MODULE,
-		 .open = psb_open,
-		 .release = psb_release,
-		 .unlocked_ioctl = drm_ioctl,
-		 .mmap = psb_mmap,
-		 .poll = psb_poll,
-		 .fasync = drm_fasync,
-		 .read = drm_read,
-		 },
+	.fops = &psb_driver_fops,
 	.name = DRIVER_NAME,
 	.desc = DRIVER_DESC,
 	.date = PSB_DRM_DRIVER_DATE,
