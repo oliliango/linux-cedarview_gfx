@@ -447,7 +447,7 @@ void pstore_del_timer(void)
 int pstore_write(enum pstore_type_id type, const char *buf, size_t size)
 {
 	size_t len;
-	int err = 0, err2;
+	int err = 0;
 
 	if (!psinfo)
 		return -ENODEV;
@@ -463,16 +463,14 @@ int pstore_write(enum pstore_type_id type, const char *buf, size_t size)
 		psinfo->ext_part = 1;
 	}
 
-	while (size) {
+	while (size && !err) {
 		len = min(size, psinfo->bufsize - psinfo->ext_len);
 		memcpy(psinfo->buf + psinfo->ext_len, buf, len);
 		psinfo->ext_len += len;
 		buf += len;
 		size -= len;
 		if (psinfo->ext_len == psinfo->bufsize) {
-			err2 = pstore_ext_flush();
-			if (err2 && !err)
-				err = err2;
+			err = pstore_ext_flush();
 		}
 	}
 
