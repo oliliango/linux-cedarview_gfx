@@ -268,6 +268,7 @@ static DEFINE_SPINLOCK(dbg_lock);
 static int dbg_dump(void *data, u64 val)
 {
 	unsigned long flags;
+	int saved_loglevel;
 
 	switch (val) {
 	case KMSG_DUMP_PANIC:
@@ -277,7 +278,10 @@ static int dbg_dump(void *data, u64 val)
 	case KMSG_DUMP_HALT:
 	case KMSG_DUMP_POWEROFF:
 		spin_lock_irqsave(&dbg_lock, flags);
+		saved_loglevel = console_loglevel;
+		console_loglevel =  15;
 		kmsg_dump(val);
+		console_loglevel = saved_loglevel;
 		spin_unlock_irqrestore(&dbg_lock, flags);
 		return 0;
 	}
