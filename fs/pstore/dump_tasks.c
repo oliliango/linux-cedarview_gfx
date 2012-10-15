@@ -20,55 +20,73 @@
 #include <linux/module.h>
 #include <linux/console.h>
 #include <linux/sched.h>
+#include <linux/hardirq.h>
+#include <linux/delay.h>
 #include <linux/pstore.h>
 
 static int enabled;
-static int dump_now;
 
 static void pstore_dump_tasks(struct console *console, const char *s,
 			      unsigned int count)
 {
-	if (!dump_now)
-		return;
 	pstore_write(PSTORE_TYPE_TASK_DUMP, s, count);
 }
+
+static struct console pstore_dump_tasks_console = {
+	.name	= "dump_tasks",
+	.write	= pstore_dump_tasks,
+	.flags	= CON_ANYTIME | CON_ENABLED,
+	.index	= -1,
+};
 
 static int pstore_notifier_cb(struct notifier_block *nb, unsigned long event,
 			      void *_psinfo)
 {
 	struct pstore_info *psinfo = _psinfo;
+	int retry;
 
-	if (psinfo->ext_reason != KMSG_DUMP_PANIC)
+	if (psinfo->ext_reason != KMSG_DUMP_PANIC || !enabled)
 		return NOTIFY_DONE;
 
 	switch (event) {
 	case PSTORE_DUMP:
-		if (enabled) {
-			dump_now = 1;
-			show_state();
+		pstore_dump_tasks_console.flags |= CON_ENABLED;
+		show_state();
+
+		/* Make sure data gets pushed to console drivers.
+		 * Yes, can take a long time to write everything,
+		 * shortening the length increases the chances of
+		 * ending up with an incomplete log.
+		 */
+		retry = 100;
+		while (retry) {
+			if (console_trylock()) {
+				console_unlock();
+				break;
+			} else {
+				mdelay(100);
+				retry--;
+			}
 		}
+
 		break;
 	case PSTORE_END:
-		dump_now = 0;
-		break;
+		pstore_dump_tasks_console.flags &= ~CON_ENABLED;
 	}
+
 	return NOTIFY_DONE;
 }
 
 static struct notifier_block pstore_notifier = {
 	.notifier_call = pstore_notifier_cb,
-};
-
-static struct console pstore_dump_tasks_console = {
-	.name	= "dump_tasks",
-	.write	= pstore_dump_tasks,
-	.flags	= CON_ENABLED | CON_ANYTIME,
-	.index	= -1,
+	/* Leave other dumpers do their job. This one can take longer. */
+	.priority = -1,
 };
 
 static int __init pstore_dump_tasks_init(void)
 {
 	register_console(&pstore_dump_tasks_console);
+	console_stop(&pstore_dump_tasks_console);
 	pstore_notifier_register(&pstore_notifier);
 	return 0;
 }
