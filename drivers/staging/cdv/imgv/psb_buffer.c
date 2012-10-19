@@ -11,7 +11,7 @@
  * more details.
  *
  * You should have received a copy of the GNU General Public License along with
- * this program; if not, write to the Free Software Foundation, Inc., 
+ * this program; if not, write to the Free Software Foundation, Inc.,
  * 51 Franklin St - Fifth Floor, Boston, MA 02110-1301 USA.
  *
  **************************************************************************/
@@ -19,6 +19,7 @@
  * Authors: Thomas Hellstrom <thomas-at-tungstengraphics.com>
  */
 #include "ttm/ttm_placement.h"
+#include "ttm/ttm_page_alloc.h"
 #include "ttm/ttm_execbuf_util.h"
 #include "psb_ttm_fence_api.h"
 #include <drm/drmP.h>
@@ -27,8 +28,8 @@
 
 #define DRM_MEM_TTM       26
 
-struct drm_psb_ttm_backend {
-	struct ttm_backend base;
+struct drm_psb_ttm_tt {
+	struct ttm_tt ttm;
 	struct page **pages;
 	unsigned int desired_tile_stride;
 	unsigned int hw_tile_stride;
@@ -119,7 +120,7 @@ static void psb_evict_mask(struct ttm_buffer_object *bo, struct ttm_placement* p
 	placement->placement = &cur_placement;
 	placement->num_busy_placement = 0;
 	placement->busy_placement = NULL;
-	
+
 	/* all buffers evicted to system memory */
 	/* return cur_placement | TTM_PL_FLAG_SYSTEM; */
 }
@@ -219,26 +220,13 @@ static int psb_move(struct ttm_buffer_object *bo,
 	return 0;
 }
 
-static int drm_psb_tbe_populate(struct ttm_backend *backend,
-				unsigned long num_pages,
-				struct page **pages,
-				struct page *dummy_read_page,
-				dma_addr_t *dma_addrs)
+static int drm_psb_tbe_unbind(struct ttm_tt *ttm)
 {
-	struct drm_psb_ttm_backend *psb_be =
-	    container_of(backend, struct drm_psb_ttm_backend, base);
-
-	psb_be->pages = pages;
-	return 0;
-}
-
-static int drm_psb_tbe_unbind(struct ttm_backend *backend)
-{
-	struct ttm_bo_device *bdev = backend->bdev;
+	struct ttm_bo_device *bdev = ttm->bdev;
 	struct drm_psb_private *dev_priv =
 	    container_of(bdev, struct drm_psb_private, bdev);
-	struct drm_psb_ttm_backend *psb_be =
-	    container_of(backend, struct drm_psb_ttm_backend, base);
+	struct drm_psb_ttm_tt *psb_be =
+	    container_of(ttm, struct drm_psb_ttm_tt, ttm);
 	struct psb_mmu_pd *pd = psb_mmu_get_default_pd(dev_priv->mmu);
 	/* struct ttm_mem_type_manager *man = &bdev->man[psb_be->mem_type]; */
 
@@ -253,28 +241,30 @@ static int drm_psb_tbe_unbind(struct ttm_backend *backend)
 	}
 
 	psb_mmu_remove_pages(pd, psb_be->offset,
-			     psb_be->num_pages,
+			     psb_be->ttm.num_pages,
 			     psb_be->desired_tile_stride,
 			     psb_be->hw_tile_stride);
 
 	return 0;
 }
 
-static int drm_psb_tbe_bind(struct ttm_backend *backend,
+static int drm_psb_tbe_bind(struct ttm_tt *ttm,
 			    struct ttm_mem_reg *bo_mem)
 {
-	struct ttm_bo_device *bdev = backend->bdev;
+	struct ttm_bo_device *bdev = ttm->bdev;
 	struct drm_psb_private *dev_priv =
 	    container_of(bdev, struct drm_psb_private, bdev);
-	struct drm_psb_ttm_backend *psb_be =
-	    container_of(backend, struct drm_psb_ttm_backend, base);
+	struct drm_psb_ttm_tt *psb_be =
+	    container_of(ttm, struct drm_psb_ttm_tt, ttm);
 	struct psb_mmu_pd *pd = psb_mmu_get_default_pd(dev_priv->mmu);
 	struct ttm_mem_type_manager *man = &bdev->man[bo_mem->mem_type];
 	int type;
 	int ret = 0;
 
 	psb_be->mem_type = bo_mem->mem_type;
-	psb_be->num_pages = bo_mem->num_pages;
+	/* psb_be->pages = ttm->pages; */
+	psb_be->ttm.num_pages = bo_mem->num_pages;
+	/* psb_be->num_pages = ttm->num_pages; */
 	psb_be->desired_tile_stride = 0;
 	psb_be->hw_tile_stride = 0;
 	psb_be->offset = (bo_mem->start << PAGE_SHIFT) +
@@ -290,13 +280,13 @@ static int drm_psb_tbe_bind(struct ttm_backend *backend,
 
 		ret = psb_gtt_insert_pages(dev_priv->pg, psb_be->pages,
 					   gatt_p_offset,
-					   psb_be->num_pages,
+					   psb_be->ttm.num_pages,
 					   psb_be->desired_tile_stride,
 					   psb_be->hw_tile_stride, type);
 	}
 
-	ret = psb_mmu_insert_pages(pd, psb_be->pages,
-				   psb_be->offset, psb_be->num_pages,
+	ret = psb_mmu_insert_pages(pd, psb_be->ttm.pages,
+				   psb_be->offset, psb_be->ttm.num_pages,
 				   psb_be->desired_tile_stride,
 				   psb_be->hw_tile_stride, type);
 	if (ret)
@@ -304,48 +294,43 @@ static int drm_psb_tbe_bind(struct ttm_backend *backend,
 
 	return 0;
 out_err:
-	drm_psb_tbe_unbind(backend);
+	drm_psb_tbe_unbind(ttm);
 	return ret;
 
 }
 
-static void drm_psb_tbe_clear(struct ttm_backend *backend)
+static void drm_psb_tbe_destroy(struct ttm_tt *ttm)
 {
-	struct drm_psb_ttm_backend *psb_be =
-	    container_of(backend, struct drm_psb_ttm_backend, base);
+	struct drm_psb_ttm_tt *psb_be =
+	    container_of(ttm, struct drm_psb_ttm_tt, ttm);
 
-	psb_be->pages = NULL;
-	return;
-}
-
-static void drm_psb_tbe_destroy(struct ttm_backend *backend)
-{
-	struct drm_psb_ttm_backend *psb_be =
-	    container_of(backend, struct drm_psb_ttm_backend, base);
-
-	if (backend)
+	if (ttm)
 		kfree(psb_be);
 }
 
 static struct ttm_backend_func psb_ttm_backend = {
-	.populate = drm_psb_tbe_populate,
-	.clear = drm_psb_tbe_clear,
 	.bind = drm_psb_tbe_bind,
 	.unbind = drm_psb_tbe_unbind,
 	.destroy = drm_psb_tbe_destroy,
 };
 
-static struct ttm_backend *drm_psb_tbe_init(struct ttm_bo_device *bdev)
+static struct ttm_tt  *drm_psb_tbe_ttm_create(struct ttm_bo_device *bdev,
+                                              unsigned long size, uint32_t page_flags,
+                                              struct page *dummy_read_page)
 {
-	struct drm_psb_ttm_backend *psb_be;
+	struct drm_psb_ttm_tt *psb_be;
 
 	psb_be = kzalloc(sizeof(*psb_be), GFP_KERNEL);
 	if (!psb_be)
 		return NULL;
-	psb_be->pages = NULL;
-	psb_be->base.func = &psb_ttm_backend;
-	psb_be->base.bdev = bdev;
-	return &psb_be->base;
+	psb_be->ttm.pages = NULL;
+	psb_be->ttm.func = &psb_ttm_backend;
+	psb_be->ttm.bdev = bdev;
+
+	if (ttm_tt_init(&psb_be->ttm, bdev, size, page_flags, dummy_read_page))
+		return NULL;
+
+	return &psb_be->ttm;
 }
 
 static int psb_ttm_io_mem_reserve(struct ttm_bo_device *bdev, struct ttm_mem_reg *mem)
@@ -426,7 +411,9 @@ struct ttm_bo_driver psb_ttm_bo_driver = {
 	.num_mem_type_prio = ARRAY_SIZE(psb_mem_prios),
 	.num_mem_busy_prio = ARRAY_SIZE(psb_busy_prios),
 */
-	.create_ttm_backend_entry = &drm_psb_tbe_init,
+	.ttm_tt_create = &drm_psb_tbe_ttm_create,
+	.ttm_tt_populate = &ttm_pool_populate,
+	.ttm_tt_unpopulate = &ttm_pool_unpopulate,
 	.invalidate_caches = &psb_invalidate_caches,
 	.init_mem_type = &psb_init_mem_type,
 	.evict_flags = &psb_evict_mask,
