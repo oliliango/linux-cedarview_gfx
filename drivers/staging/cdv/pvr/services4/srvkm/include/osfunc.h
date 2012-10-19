@@ -39,7 +39,6 @@ extern "C" {
 #if defined(__linux__) && defined(__KERNEL__)
 #include <linux/hardirq.h>
 #include <linux/string.h>
-#include <asm/system.h>
 #if defined(__arm__)
 #include <asm/memory.h>
 #endif
@@ -47,7 +46,7 @@ extern "C" {
 
 
 	
-	#define PVRSRV_PAGEABLE_SELECT		PVRSRV_OS_PAGEABLE_HEAP
+#define PVRSRV_PAGEABLE_SELECT		PVRSRV_OS_PAGEABLE_HEAP
 
 #define KERNEL_ID			0xffffffffL
 #define POWER_MANAGER_ID	0xfffffffeL
