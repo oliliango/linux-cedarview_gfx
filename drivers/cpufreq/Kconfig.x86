@@ -2,6 +2,14 @@
 # x86 CPU Frequency scaling drivers
 #
 
+config X86_SNB_CPUFREQ
+       tristate "SandyBridge frequency Governor"
+       help
+         This driver will override the CPU_FREQ subsystem when
+	 the system has a SandyBridge processor
+
+	 If in doubt, say N.
+
 config X86_PCC_CPUFREQ
 	tristate "Processor Clocking Control interface driver"
 	depends on ACPI && ACPI_PROCESSOR
