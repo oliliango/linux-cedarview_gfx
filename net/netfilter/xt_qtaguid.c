@@ -1200,7 +1200,8 @@ static struct sock_tag *get_sock_stat(const struct sock *sk)
 static int ipx_proto(const struct sk_buff *skb,
 		     struct xt_action_param *par)
 {
-	int thoff, tproto;
+	int thoff = 0;
+	int tproto;
 
 	switch (par->family) {
 	case NFPROTO_IPV6:
