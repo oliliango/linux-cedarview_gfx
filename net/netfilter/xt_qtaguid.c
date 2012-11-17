@@ -1744,7 +1744,7 @@ static void account_for_uid(const struct sk_buff *skb,
 static bool qtaguid_mt(const struct sk_buff *skb, struct xt_action_param *par)
 {
 	const struct xt_qtaguid_match_info *info = par->matchinfo;
-	const struct file *filp;
+	struct file *filp;
 	bool got_sock = false;
 	struct sock *sk;
 	uid_t sock_uid;
@@ -1798,16 +1798,9 @@ static bool qtaguid_mt(const struct sk_buff *skb, struct xt_action_param *par)
 	}
 	MT_DEBUG("qtaguid[%d]: sk=%p got_sock=%d fam=%d proto=%d\n",
 		 par->hooknum, sk, got_sock, par->family, ipx_proto(skb, par));
-	if (sk != NULL) {
-		MT_DEBUG("qtaguid[%d]: sk=%p->sk_socket=%p->file=%p\n",
-			par->hooknum, sk, sk->sk_socket,
-			sk->sk_socket ? sk->sk_socket->file : (void *)-1LL);
-		filp = sk->sk_socket ? sk->sk_socket->file : NULL;
-		MT_DEBUG("qtaguid[%d]: filp...uid=%u\n",
-			par->hooknum, filp ? filp->f_cred->fsuid : -1);
-	}
 
-	if (sk == NULL || sk->sk_socket == NULL) {
+	if (sk == NULL || sk->sk_socket == NULL ||
+	    sk->sk_state == TCP_TIME_WAIT) {
 		/*
 		 * Here, the qtaguid_find_sk() using connection tracking
 		 * couldn't find the owner, so for now we just count them
@@ -1830,7 +1823,14 @@ static bool qtaguid_mt(const struct sk_buff *skb, struct xt_action_param *par)
 		res = false;
 		goto put_sock_ret_res;
 	}
-	filp = sk->sk_socket->file;
+	if (sk != NULL) {
+		MT_DEBUG("qtaguid[%d]: sk=%p->sk_socket=%p->file=%p\n",
+			par->hooknum, sk, sk->sk_socket,
+			sk->sk_socket ? sk->sk_socket->file : (void *)-1LL);
+		filp = sk->sk_socket ? sk->sk_socket->file : NULL;
+		MT_DEBUG("qtaguid[%d]: filp...uid=%u\n",
+			par->hooknum, filp ? filp->f_cred->fsuid : -1);
+	}
 	if (filp == NULL) {
 		MT_DEBUG("qtaguid[%d]: leaving filp=NULL\n", par->hooknum);
 		account_for_uid(skb, sk, 0, par);
