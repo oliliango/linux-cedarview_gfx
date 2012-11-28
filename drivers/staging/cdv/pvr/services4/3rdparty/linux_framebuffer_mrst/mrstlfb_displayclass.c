@@ -1399,7 +1399,7 @@ MRST_ERROR MRSTLFBInit(struct drm_device * dev)
 			return (MRST_ERROR_INIT_FAILURE);
 		}
 
-		if(MRSTLFBGetLibFuncAddr ("PVRGetDisplayClassJTable", &pfnGetPVRJTable) != MRST_OK)
+		if(MRSTLFBGetLibFuncAddr ("PVRGetDisplayClassJTable_cdv", &pfnGetPVRJTable) != MRST_OK)
 		{
 			return (MRST_ERROR_INIT_FAILURE);
 		}

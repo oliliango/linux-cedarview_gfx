@@ -415,12 +415,12 @@ BCE_ERROR
 BCGetLibFuncAddr (BCE_HANDLE unref__ hExtDrv, char *szFunctionName,
         PFN_BC_GET_PVRJTABLE * ppfnFuncTable)
 {
-    if (strcmp ("PVRGetBufferClassJTable", szFunctionName) != 0)
+    if (strcmp ("PVRGetBufferClassJTable_cdv", szFunctionName) != 0)
     {
         return (BCE_ERROR_INVALID_PARAMS);
     }
 
-    *ppfnFuncTable = PVRGetBufferClassJTable;
+    *ppfnFuncTable = PVRGetBufferClassJTable_cdv;
 
     return (BCE_OK);
 }

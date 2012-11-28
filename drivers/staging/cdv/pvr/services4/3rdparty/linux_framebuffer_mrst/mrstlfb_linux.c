@@ -74,13 +74,13 @@ void MRSTLFBFreeKernelMem(void *pvMem)
 
 MRST_ERROR MRSTLFBGetLibFuncAddr (char *szFunctionName, PFN_DC_GET_PVRJTABLE *ppfnFuncTable)
 {
-	if(strcmp("PVRGetDisplayClassJTable", szFunctionName) != 0)
+	if(strcmp("PVRGetDisplayClassJTable_cdv", szFunctionName) != 0)
 	{
 		return (MRST_ERROR_INVALID_PARAMS);
 	}
 
 
-	*ppfnFuncTable = PVRGetDisplayClassJTable;
+	*ppfnFuncTable = PVRGetDisplayClassJTable_cdv;
 
 	return (MRST_OK);
 }

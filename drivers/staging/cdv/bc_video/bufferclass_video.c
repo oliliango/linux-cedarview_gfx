@@ -199,7 +199,7 @@ BC_Video_Register (int id)
             return (BCE_ERROR_INIT_FAILURE);
         }
         if (BCGetLibFuncAddr
-                (psDevInfo->hPVRServices, "PVRGetBufferClassJTable",
+                (psDevInfo->hPVRServices, "PVRGetBufferClassJTable_cdv",
                  &pfnGetPVRJTable) != BCE_OK)
         {
             return (BCE_ERROR_INIT_FAILURE);

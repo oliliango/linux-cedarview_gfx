@@ -60,7 +60,7 @@ extern "C"
     } bc_buf_params_t;
 
     extern IMG_IMPORT IMG_BOOL
-        PVRGetBufferClassJTable (PVRSRV_BC_BUFFER2SRV_KMJTABLE * psJTable);
+        PVRGetBufferClassJTable_cdv (PVRSRV_BC_BUFFER2SRV_KMJTABLE * psJTable);
 
 #define BC_VIDEO_DEVICE_MAX_ID          5
 #define BC_CAMERA_DEVICEID              8
