@@ -81,9 +81,10 @@ static void quota2_log(unsigned int hooknum,
 		return;
 	}
 
-	/* NLMSG_PUT() uses "goto nlmsg_failure" */
-	nlh = NLMSG_PUT(log_skb, /*pid*/0, /*seq*/0, qlog_nl_event,
-			sizeof(*pm));
+	/* expand macro NLMSG_PUT() since it's removed */
+	if (unlikely(skb_tailroom(log_skb) < (int)NLMSG_SPACE(sizeof(*pm))))
+		goto nlmsg_failure;
+	nlh = __nlmsg_put(log_skb, 0, 0, qlog_nl_event, sizeof(*pm), 0);
 	pm = NLMSG_DATA(nlh);
 	if (skb->tstamp.tv64 == 0)
 		__net_timestamp((struct sk_buff *)skb);
@@ -348,9 +349,13 @@ static int __init quota_mt2_init(void)
 	pr_debug("xt_quota2: init()");
 
 #ifdef CONFIG_NETFILTER_XT_MATCH_QUOTA2_LOG
+	struct netlink_kernel_cfg cfg = {
+		.groups = 1,
+		.input = NULL,
+		.cb_mutex = NULL,
+	};
 	nflognl = netlink_kernel_create(&init_net,
-					NETLINK_NFLOG, 1, NULL,
-					NULL, THIS_MODULE);
+					NETLINK_NFLOG, &cfg);
 	if (!nflognl)
 		return -ENOMEM;
 #endif
