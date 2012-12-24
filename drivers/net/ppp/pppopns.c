@@ -35,6 +35,7 @@
 #include <linux/if_pppox.h>
 #include <linux/ppp_channel.h>
 #include <asm/uaccess.h>
+#include <uapi/linux/if_pppopns.h>
 
 #define GRE_HEADER_SIZE		8
 
