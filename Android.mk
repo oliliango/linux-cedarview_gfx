@@ -77,8 +77,7 @@ WL_SRC := $(KERNEL_DIR)/$(WL_PATH)/hybrid-portsrc_x86_32-v5_100_82_112.tar.gz
 $(WL_SRC):
 	@echo Downloading $(@F)...
 	$(hide) curl http://www.broadcom.com/docs/linux_sta/$(@F) > $@ && tar zxf $@ -C $(@D) --overwrite && \
-		sed -i '/<linux\/wireless.h>/ a#include <linux/semaphore.h>' $(@D)/src/wl/sys/wl_iw.h && \
-		sed -i 's|\(EXTRA_LDFLAGS.*= \)\($$(src)\)|\1\$$(srctree)/\2|; s|\(LINUXVER_GOODFOR_CFG80211:=\)|\1TRUE #|' $(@D)/Makefile
+		cd $(KERNEL_DIR) && patch -s -p1 -i $(WL_PATH)/wl.patch
 $(INSTALLED_KERNEL_TARGET): $(if $(WL_ENABLED),$(WL_SRC))
 
 installclean: FILES += $(KBUILD_OUTPUT) $(INSTALLED_KERNEL_TARGET)

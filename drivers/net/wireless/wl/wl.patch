@@ -1,0 +1,108 @@
+--- a/drivers/net/wireless/wl/Makefile
++++ b/drivers/net/wireless/wl/Makefile
+@@ -13,6 +13,7 @@
+ #
+ # $Id: Makefile_kbuild_portsrc,v 1.6.54.4 2011-01-27 00:55:34 Exp $
+ 
++API := CFG80211
+ ifneq ($(KERNELRELEASE),)
+ 
+   LINUXVER_GOODFOR_CFG80211:=$(strip $(shell \
+@@ -120,7 +121,7 @@ EXTRA_CFLAGS       += -I$(src)/src/include
+ EXTRA_CFLAGS       += -I$(src)/src/wl/sys -I$(src)/src/wl/phy
+ #EXTRA_CFLAGS       += -DBCMDBG_ASSERT
+ 
+-EXTRA_LDFLAGS      := $(src)/lib/wlc_hybrid.o_shipped
++EXTRA_LDFLAGS      := $(srctree)/$(src)/lib/wlc_hybrid.o_shipped
+ 
+ all:
+ 	KBUILD_NOPEDANTIC=1 make -C /lib/modules/`uname -r`/build M=`pwd`
+--- a/drivers/net/wireless/wl/src/wl/sys/wl_cfg80211.c
++++ b/drivers/net/wireless/wl/src/wl/sys/wl_cfg80211.c
+@@ -42,7 +42,7 @@ static s32 wl_cfg80211_change_iface(struct wiphy *wiphy, struct net_device *ndev
+            enum nl80211_iftype type, u32 *flags, struct vif_params *params);
+ static s32 __wl_cfg80211_scan(struct wiphy *wiphy, struct net_device *ndev,
+            struct cfg80211_scan_request *request, struct cfg80211_ssid *this_ssid);
+-static s32 wl_cfg80211_scan(struct wiphy *wiphy, struct net_device *ndev,
++static s32 wl_cfg80211_scan(struct wiphy *wiphy,
+            struct cfg80211_scan_request *request);
+ static s32 wl_cfg80211_set_wiphy_params(struct wiphy *wiphy, u32 changed);
+ static s32 wl_cfg80211_join_ibss(struct wiphy *wiphy, struct net_device *dev,
+@@ -570,10 +570,12 @@ scan_out:
+ }
+ 
+ static s32
+-wl_cfg80211_scan(struct wiphy *wiphy, struct net_device *ndev,
++wl_cfg80211_scan(struct wiphy *wiphy,
+                  struct cfg80211_scan_request *request)
+ {
+ 	s32 err = 0;
++	struct wl_priv *wl = wiphy_to_wl(wiphy);
++	struct net_device *ndev = wl_to_ndev(wl);
+ 
+ 	CHECK_SYS_UP();
+ 	err = __wl_cfg80211_scan(wiphy, ndev, request, NULL);
+@@ -1466,7 +1468,10 @@ wl_cfg80211_get_station(struct wiphy *wiphy, struct net_device *dev,
+ 		scb_val.val = 0;
+ 		err = wl_dev_ioctl(dev, WLC_GET_RSSI, &scb_val, sizeof(scb_val_t));
+ 		if (err) {
+-			WL_ERR(("Could not get rssi (%d)\n", err));
++			if (err != -EINVAL) {
++				// Don't fill syslog with EINVAL error
++				WL_ERR(("Could not get rssi (%d)\n", err));
++			}
+ 			return err;
+ 		}
+ 		rssi = dtoh32(scb_val.val);
+--- a/drivers/net/wireless/wl/src/wl/sys/wl_iw.h
++++ b/drivers/net/wireless/wl/src/wl/sys/wl_iw.h
+@@ -16,6 +16,7 @@
+ #define _wl_iw_h_
+ 
+ #include <linux/wireless.h>
++#include <linux/semaphore.h>
+ 
+ #include <typedefs.h>
+ #include <proto/ethernet.h>
+--- a/drivers/net/wireless/wl/src/wl/sys/wl_linux.c
++++ b/drivers/net/wireless/wl/src/wl/sys/wl_linux.c
+@@ -40,7 +40,7 @@
+ #include <linux/pci_ids.h>
+ #define WLC_MAXBSSCFG		1
+ 
+-#include <asm/system.h>
++#include <asm/switch_to.h>
+ #include <asm/io.h>
+ #include <asm/irq.h>
+ #include <asm/pgtable.h>
+@@ -256,7 +256,7 @@ module_param(nompc, int, 0);
+ #define quote_str(s) to_str(s)
+ 
+ #ifndef BRCM_WLAN_IFNAME
+-#define BRCM_WLAN_IFNAME eth%d
++#define BRCM_WLAN_IFNAME wlan%d
+ #endif
+ 
+ static char name[IFNAMSIZ] = quote_str(BRCM_WLAN_IFNAME);
+@@ -385,7 +385,7 @@ static const struct net_device_ops wl_netdev_ops =
+ #endif
+ 	.ndo_get_stats = wl_get_stats,
+ 	.ndo_set_mac_address = wl_set_mac_address,
+-	.ndo_set_multicast_list = wl_set_multicast_list,
++	.ndo_set_rx_mode = wl_set_multicast_list,
+ 	.ndo_do_ioctl = wl_ioctl
+ };
+ 
+@@ -1579,11 +1579,7 @@ wl_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
+ 	}
+ 
+ 	WL_LOCK(wl);
+-	if (!capable(CAP_NET_ADMIN)) {
+-		bcmerror = BCME_EPERM;
+-	} else {
+-		bcmerror = wlc_ioctl(wl->wlc, ioc.cmd, buf, ioc.len, wlif->wlcif);
+-	}
++	bcmerror = wlc_ioctl(wl->wlc, ioc.cmd, buf, ioc.len, wlif->wlcif);
+ 	WL_UNLOCK(wl);
+ 
+ done1:
