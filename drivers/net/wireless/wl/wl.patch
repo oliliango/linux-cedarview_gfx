@@ -42,6 +42,15 @@
  
  	CHECK_SYS_UP();
  	err = __wl_cfg80211_scan(wiphy, ndev, request, NULL);
+@@ -742,7 +744,7 @@
+ 	else
+ 		memset(&join_params.params.bssid, 0, ETHER_ADDR_LEN);
+ 
+-	wl_ch_to_chanspec(params->channel, &join_params, &join_params_size);
++	wl_ch_to_chanspec(params->chandef.chan, &join_params, &join_params_size);
+ 
+ 	err = wl_dev_ioctl(dev, WLC_SET_SSID, &join_params, join_params_size);
+ 	if (err) {
 @@ -1466,7 +1468,10 @@ wl_cfg80211_get_station(struct wiphy *wiphy, struct net_device *dev,
  		scb_val.val = 0;
  		err = wl_dev_ioctl(dev, WLC_GET_RSSI, &scb_val, sizeof(scb_val_t));
@@ -54,6 +63,25 @@
  			return err;
  		}
  		rssi = dtoh32(scb_val.val);
+@@ -2037,6 +2042,7 @@
+ static s32 wl_update_bss_info(struct wl_priv *wl)
+ {
+ 	struct cfg80211_bss *bss;
++	struct cfg80211_bss_ies *bss_ied;
+ 	struct wl_bss_info *bi;
+ 	struct wlc_ssid *ssid;
+ 	struct bcm_tlv *tim;
+@@ -2074,8 +2080,8 @@
+ 		beacon_interval = cpu_to_le16(bi->beacon_period);
+ 	} else {
+ 		WL_DBG(("Found the AP in the list - BSSID %pM\n", bss->bssid));
+-		ie = bss->information_elements;
+-		ie_len = bss->len_information_elements;
++		ie = bss->ies;
++		ie_len = bss_ied->len;
+ 		beacon_interval = bss->beacon_interval;
+ 		cfg80211_put_bss(bss);
+ 	}
 --- a/drivers/net/wireless/wl/src/wl/sys/wl_iw.h
 +++ b/drivers/net/wireless/wl/src/wl/sys/wl_iw.h
 @@ -16,6 +16,7 @@
