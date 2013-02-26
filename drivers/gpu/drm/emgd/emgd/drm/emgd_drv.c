@@ -2365,7 +2365,7 @@ irqreturn_t emgd_driver_irq_handler(int irq, void *arg)
 } /* emgd_driver_irq_handler() */
 
 
-static int __devinit emgd_pci_probe(struct pci_dev *pdev,
+static int emgd_pci_probe(struct pci_dev *pdev,
 		const struct pci_device_id *ent)
 {
 	if (PCI_FUNC(pdev->devfn)) {
@@ -2496,7 +2496,6 @@ static struct drm_driver driver = {
 	.irq_postinstall    = emgd_driver_irq_postinstall,
 	.irq_uninstall      = emgd_driver_irq_uninstall,
 	.irq_handler        = emgd_driver_irq_handler,
-	.reclaim_buffers    = drm_core_reclaim_buffers,
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,37)
 	.get_map_ofs        = drm_core_get_map_ofs,
 	.get_reg_ofs        = drm_core_get_reg_ofs,
