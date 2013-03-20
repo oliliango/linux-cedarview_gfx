@@ -581,13 +581,12 @@ psb_gtt_mm_get_mem_mapping_locked(struct drm_open_hash *ht,
 	return 0;
 }
 
-static int
-psb_gtt_mm_insert_mem_mapping_locked(struct drm_open_hash *ht,
+static int psb_gtt_mm_insert_mem_mapping_locked(struct drm_open_hash *ht,
 			      u32 key,
 			      struct psb_gtt_mem_mapping *hentry)
 {
 	struct drm_hash_item *item;
-	struct psb_gtt_hash_entry *entry;
+	struct psb_gtt_hash_entry *entry = NULL;
 	int ret;
 
 	if (!hentry) {
@@ -618,7 +617,7 @@ psb_gtt_mm_alloc_insert_mem_mapping(struct psb_gtt_mm *mm,
 				    struct drm_mm_node *node,
 				    struct psb_gtt_mem_mapping **entry)
 {
-	struct psb_gtt_mem_mapping *mapping;
+	struct psb_gtt_mem_mapping *mapping = NULL;
 	int ret;
 
 	if (!node || !ht) {
@@ -704,8 +703,8 @@ static int psb_gtt_add_node(struct psb_gtt_mm *mm,
 			    struct drm_mm_node *node,
 			    struct psb_gtt_mem_mapping **entry)
 {
-	struct psb_gtt_hash_entry *hentry;
-	struct psb_gtt_mem_mapping *mapping;
+	struct psb_gtt_hash_entry *hentry = NULL;
+	struct psb_gtt_mem_mapping *mapping = NULL;
 	int ret;
 
 	ret = psb_gtt_mm_alloc_insert_ht(mm, tgid, &hentry);

@@ -68,7 +68,7 @@ static void mdfld_hdmi_mode_set(struct drm_encoder *encoder,
 }
 
 static bool mdfld_hdmi_mode_fixup(struct drm_encoder *encoder,
-				  struct drm_display_mode *mode,
+				  const struct drm_display_mode *mode,
 				  struct drm_display_mode *adjusted_mode)
 {
 
@@ -462,7 +462,6 @@ static enum drm_connector_status mdfld_hdmi_detect(struct drm_connector *connect
 			hdmi_priv->has_hdmi_audio = drm_detect_monitor_audio(edid);
 		}
 
-		psb_intel_output->base.display_info.raw_edid = NULL;
 		kfree(edid);
 	}
 
@@ -506,13 +505,13 @@ static int mdfld_hdmi_set_property(struct drm_connector *connector,
 			goto set_prop_error;
 		}
 
-		if (drm_connector_property_get_value(connector, property, &curValue))
+		if (drm_object_property_get_value(&connector->base, property, &curValue))
 			goto set_prop_error;
 
 		if (curValue == value)
 			goto set_prop_done;
 
-		if (drm_connector_property_set_value(connector, property, value))
+		if (drm_object_property_set_value(&connector->base, property, value))
 			goto set_prop_error;
 
 		bTransitionFromToCentered = (curValue == DRM_MODE_SCALE_NO_SCALE) ||
@@ -648,7 +647,7 @@ void mdfld_hdmi_init(struct drm_device *dev, struct psb_intel_mode_device *mode_
 
 	connector->polled = DRM_CONNECTOR_POLL_HPD;
 
-	drm_connector_attach_property(connector, dev->mode_config.scaling_mode_property, DRM_MODE_SCALE_FULLSCREEN);
+	drm_object_attach_property(&connector->base, dev->mode_config.scaling_mode_property, DRM_MODE_SCALE_FULLSCREEN);
 
 	switch (reg) {
 	case SDVOB:

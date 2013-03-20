@@ -168,7 +168,7 @@ int psb_intel_lvds_mode_valid(struct drm_connector *connector,
 }
 
 bool psb_intel_lvds_mode_fixup(struct drm_encoder *encoder,
-				  struct drm_display_mode *mode,
+				  const struct drm_display_mode *mode,
 				  struct drm_display_mode *adjusted_mode)
 {
 	struct psb_intel_mode_device *mode_dev =
@@ -374,7 +374,7 @@ int psb_intel_lvds_set_property(struct drm_connector *connector,
 			goto set_prop_error;
 		}
 
-		if (drm_connector_property_get_value(connector,
+		if (drm_object_property_get_value(&connector->base,
 						     property,
 						     &curValue))
 			goto set_prop_error;
@@ -382,7 +382,7 @@ int psb_intel_lvds_set_property(struct drm_connector *connector,
 		if (curValue == value)
 			goto set_prop_done;
 
-		if (drm_connector_property_set_value(connector,
+		if (drm_object_property_set_value(&connector->base,
 							property,
 							value))
 			goto set_prop_error;
@@ -542,7 +542,7 @@ void psb_intel_lvds_init(struct drm_device *dev,
 	connector->doublescan_allowed = false;
 
 	/*Attach connector properties*/
-	drm_connector_attach_property(connector,
+	drm_object_attach_property(&connector->base,
 				      dev->mode_config.scaling_mode_property,
 				      DRM_MODE_SCALE_FULLSCREEN);
 
