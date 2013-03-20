@@ -188,7 +188,6 @@ psb_placement_fence_type(struct ttm_buffer_object *bo,
 	uint32_t clr_flags = clr_val_flags & 0xFFFFFFFF;
 	*/
 	struct ttm_fence_object *old_fence;
-	uint32_t old_fence_type;
 	struct ttm_placement placement;
 
 	if (unlikely
@@ -215,11 +214,8 @@ psb_placement_fence_type(struct ttm_buffer_object *bo,
 
 	*new_fence_type = n_fence_type;
 	old_fence = (struct ttm_fence_object *) bo->sync_obj;
-	old_fence_type = (uint32_t) (unsigned long) bo->sync_obj_arg;
 
-	if (old_fence && ((new_fence_class != old_fence->fence_class) ||
-			  ((n_fence_type ^ old_fence_type) &
-			   old_fence_type))) {
+	if (old_fence && (new_fence_class != old_fence->fence_class)) {
 		ret = ttm_bo_wait(bo, 0, 1, 0);
 		if (unlikely(ret != 0))
 			return ret;
@@ -263,7 +259,6 @@ int psb_validate_kernel_buffer(struct psb_context *context,
 	}
 
 	item->base.bo = ttm_bo_reference(bo);
-	item->base.new_sync_obj_arg = (void *) (unsigned long) cur_fence_type;
 	item->base.reserved = 1;
 
 	list_add_tail(&item->base.head, &context->kern_validate_list);
@@ -331,8 +326,6 @@ static int psb_validate_buffer_list(struct drm_file *file_priv,
 			goto out_err;
 		*/
 		fence_types |= cur_fence_type;
-		entry->new_sync_obj_arg = (void *)
-			(unsigned long) cur_fence_type;
 
 		item->offset = bo->offset;
 		item->flags = bo->mem.placement;
@@ -758,9 +751,6 @@ static int psb_handle_copyback(struct drm_device *dev,
 				spin_lock(&bo->bdev->fence_lock);
 				arg.d.rep.gpu_offset = bo->offset;
 				arg.d.rep.placement = bo->mem.placement;
-				arg.d.rep.fence_type_mask =
-					(uint32_t) (unsigned long)
-					entry->new_sync_obj_arg;
 				spin_unlock(&bo->bdev->fence_lock);
 			}
 
