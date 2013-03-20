@@ -164,7 +164,7 @@ static int psb_move_flip(struct ttm_buffer_object *bo,
 	placement.num_busy_placement = 0; /* FIXME */
 	placement.busy_placement = NULL;
 
-	ret = ttm_bo_mem_space(bo, &placement, &tmp_mem, interruptible, false, no_wait);
+	ret = ttm_bo_mem_space(bo, &placement, &tmp_mem, interruptible, no_wait);
 	if (ret)
 		return ret;
 	ret = ttm_tt_bind(bo->ttm, &tmp_mem);
@@ -174,7 +174,7 @@ static int psb_move_flip(struct ttm_buffer_object *bo,
 	if (ret)
 		goto out_cleanup;
 
-	ret = ttm_bo_move_ttm(bo, evict, false, no_wait, new_mem);
+	ret = ttm_bo_move_ttm(bo, evict, no_wait, new_mem);
 out_cleanup:
 	if (tmp_mem.mm_node) {
 		/*spin_lock(&bdev->lru_lock);*/ // lru_lock is removed from upstream TTM
@@ -186,7 +186,7 @@ out_cleanup:
 }
 
 static int psb_move(struct ttm_buffer_object *bo,
-		    bool evict, bool interruptible, bool no_wait_reserve,
+		    bool evict, bool interruptible,
 		    bool no_wait, struct ttm_mem_reg *new_mem)
 {
 	struct ttm_mem_reg *old_mem = &bo->mem;
@@ -201,7 +201,7 @@ static int psb_move(struct ttm_buffer_object *bo,
 		old_mem->mm_node = NULL;
 		*old_mem = *new_mem;
 	} else if (old_mem->mem_type == TTM_PL_SYSTEM) {
-		return ttm_bo_move_memcpy(bo, evict, false, no_wait, new_mem);
+		return ttm_bo_move_memcpy(bo, evict, no_wait, new_mem);
 	} else if (new_mem->mem_type == TTM_PL_SYSTEM) {
 		int ret = psb_move_flip(bo, evict, interruptible,
 					no_wait, new_mem);
@@ -209,12 +209,12 @@ static int psb_move(struct ttm_buffer_object *bo,
 			if (ret == -ERESTART)
 				return ret;
 			else
-				return ttm_bo_move_memcpy(bo, evict, false, no_wait,
+				return ttm_bo_move_memcpy(bo, evict, no_wait,
 							  new_mem);
 		}
 	} else {
 		if (psb_move_blit(bo, evict, no_wait, new_mem))
-			return ttm_bo_move_memcpy(bo, evict, false, no_wait,
+			return ttm_bo_move_memcpy(bo, evict, no_wait,
 						  new_mem);
 	}
 	return 0;

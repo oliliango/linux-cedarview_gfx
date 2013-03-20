@@ -262,10 +262,9 @@ static inline uint32_t ttm_fence_types(const struct ttm_fence_object *fence)
  * uint32_t representing a fence_type argument.
  */
 
-extern bool ttm_fence_sync_obj_signaled(void *sync_obj, void *sync_arg);
-extern int ttm_fence_sync_obj_wait(void *sync_obj, void *sync_arg,
-				   bool lazy, bool interruptible);
-extern int ttm_fence_sync_obj_flush(void *sync_obj, void *sync_arg);
+extern bool ttm_fence_sync_obj_signaled(void *sync_obj);
+extern int ttm_fence_sync_obj_wait(void *sync_obj, bool lazy, bool interruptible);
+extern int ttm_fence_sync_obj_flush(void *sync_obj);
 extern void ttm_fence_sync_obj_unref(void **sync_obj);
 extern void *ttm_fence_sync_obj_ref(void *sync_obj);
 
