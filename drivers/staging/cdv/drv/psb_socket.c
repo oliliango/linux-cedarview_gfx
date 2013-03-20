@@ -350,6 +350,7 @@ int psb_add_uevent_var(struct kobj_uevent_env *env, const char *format, ...)
 }
 /*EXPORT_SYMBOL_GPL(psb_add_uevent_var);*/ 
 
+#if 0
 #if defined(CONFIG_NET)
 int psb_kobject_uevent_init(void)
 {
@@ -371,4 +372,5 @@ int psb_kobject_uevent_init(void)
 
 	return 0;
 }
+#endif
 #endif
