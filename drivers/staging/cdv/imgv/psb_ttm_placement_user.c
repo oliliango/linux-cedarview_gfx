@@ -133,7 +133,6 @@ static void ttm_pl_fill_rep(struct ttm_buffer_object *bo,
 	rep->map_handle = bo->addr_space_offset;
 	rep->placement = bo->mem.placement;
 	rep->handle = user_bo->base.hash.key;
-	rep->sync_object_arg = (uint32_t) (unsigned long)bo->sync_obj_arg;
 }
 
 /* FIXME Copy from upstream TTM "ttm_bo_create", upstream TTM does not export this, so copy it here */
@@ -156,9 +155,18 @@ int ttm_bo_create_private(struct ttm_bo_device *bdev,
 		return -ENOMEM;
 
 	acc_size = ttm_bo_acc_size(bdev, size, sizeof(struct ttm_buffer_object));
-	ret = ttm_bo_init(bdev, bo, size, type, placement, page_alignment,
-				buffer_start, interruptible,
-				persistent_swap_storage, acc_size, NULL);
+	ret = ttm_bo_init(bdev,
+	                  bo,
+	                  size,
+	                  type,
+	                  placement,
+	                  page_alignment,
+	                  interruptible,
+	                  persistent_swap_storage,
+	                  acc_size,
+	                  NULL,
+	                  &ttm_bo_user_destroy
+		);
 	if (likely(ret == 0))
 		*p_bo = bo;
 
@@ -259,9 +267,9 @@ int ttm_pl_create_ioctl(struct ttm_object_file *tfile,
 		flags |=  TTM_PL_FLAG_WC | TTM_PL_FLAG_UNCACHED;
 
 	ret = ttm_bo_init(bdev, bo, req->size,
-				     ttm_bo_type_device, &placement,
-				     req->page_alignment, 0, true,
-				     NULL, acc_size, &ttm_bo_user_destroy);
+	                  ttm_bo_type_device, &placement,
+	                  req->page_alignment, true,
+	                  NULL, acc_size, NULL, &ttm_bo_user_destroy);
 	ttm_read_unlock(lock);
 
 	/*
@@ -331,10 +339,10 @@ int ttm_pl_ub_create_ioctl(struct ttm_object_file *tfile,
 					ttm_bo_type_device,
 					&placement,
 					req->page_alignment,
-					req->user_address,
 					true,
 					NULL,
 					acc_size,
+	                NULL,
 					&ttm_bo_user_destroy);
 
 	/*
@@ -476,7 +484,7 @@ int ttm_pl_setstatus_ioctl(struct ttm_object_file *tfile,
 	if (unlikely(ret != 0))
 		goto out_err1;
 
-	ret = ttm_bo_wait_cpu(bo, false);
+	ret = ttm_bo_wait(bo, false, false, false);
 	if (unlikely(ret != 0))
 		goto out_err2;
 
@@ -495,7 +503,7 @@ int ttm_pl_setstatus_ioctl(struct ttm_object_file *tfile,
 	placement.num_placement = 1;
 	flags[0] = (req->set_placement | bo->mem.placement) & ~req->clr_placement;
 
-	ret = ttm_bo_validate(bo, &placement, true, false, false);
+	ret = ttm_bo_validate(bo, &placement, false, false);
 	if (unlikely(ret != 0))
 		goto out_err2;
 

@@ -350,10 +350,11 @@ int psb_add_uevent_var(struct kobj_uevent_env *env, const char *format, ...)
 }
 /*EXPORT_SYMBOL_GPL(psb_add_uevent_var);*/ 
 
-#if 0
+
 #if defined(CONFIG_NET)
 int psb_kobject_uevent_init(void)
 {
+#if 0
 	/* This should be the 15, but 3 seems to work better.  Why? WHY!? */
 	/* uevent_sock = netlink_kernel_create(&init_net,
 					    NETLINK_PSB_KOBJECT_UEVENT,
@@ -369,8 +370,8 @@ int psb_kobject_uevent_init(void)
 		return -ENODEV;
 	}
 	netlink_set_nonroot(NETLINK_PSB_KOBJECT_UEVENT, NL_NONROOT_RECV);
-
+#endif
 	return 0;
 }
-#endif
+
 #endif
