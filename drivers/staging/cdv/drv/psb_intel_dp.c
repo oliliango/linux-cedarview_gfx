@@ -28,7 +28,6 @@
 #include <linux/i2c.h>
 #include <linux/slab.h>
 #include "drmP.h"
-#include "drm.h"
 #include "drm_crtc.h"
 #include "drm_crtc_helper.h"
 #include "psb_drv.h"
@@ -666,8 +665,9 @@ psb_intel_dp_i2c_init(struct psb_intel_output *output, const char *name)
 }
 
 static bool
-psb_intel_dp_mode_fixup(struct drm_encoder *encoder, struct drm_display_mode *mode,
-		    struct drm_display_mode *adjusted_mode)
+psb_intel_dp_mode_fixup(struct drm_encoder *encoder,
+                        const struct drm_display_mode *mode,
+                        struct drm_display_mode *adjusted_mode)
 {
 	struct psb_intel_output *output = enc_to_psb_intel_output(encoder);
 	struct psb_intel_dp *intel_dp = output->dev_priv;
@@ -680,7 +680,6 @@ psb_intel_dp_mode_fixup(struct drm_encoder *encoder, struct drm_display_mode *mo
 
 	if (is_edp(output) && intel_dp->panel_fixed_mode) {
 		psb_intel_fixed_panel_mode(intel_dp->panel_fixed_mode, adjusted_mode);
-		mode->clock = intel_dp->panel_fixed_mode->clock;
 		bpp = dev_priv->edp.bpp;
 	}
 
@@ -1530,7 +1529,6 @@ psb_intel_dp_detect(struct drm_connector *connector, bool force)
 		edid = drm_get_edid(connector, &intel_dp->adapter);
 		if (edid) {
 			intel_dp->has_audio = drm_detect_monitor_audio(edid);
-			connector->display_info.raw_edid = NULL;
 			kfree(edid);
 		}
 	}
@@ -1613,8 +1611,6 @@ psb_intel_dp_detect_audio(struct drm_connector *connector)
 	edid = drm_get_edid(connector, &intel_dp->adapter);
 	if (edid) {
 		has_audio = drm_detect_monitor_audio(edid);
-
-		connector->display_info.raw_edid = NULL;
 		kfree(edid);
 	}
 
@@ -1634,7 +1630,7 @@ psb_intel_dp_set_property(struct drm_connector *connector,
 	struct psb_intel_dp *intel_dp = output->dev_priv;
 	int ret;
 
-	ret = drm_connector_property_set_value(connector, property, val);
+	ret = drm_object_property_set_value(&connector->base, property, val);
 	if (ret)
 		return ret;
 
